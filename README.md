@@ -26,32 +26,16 @@ claude mcp add imessage --env IMESSAGE_HANDLE=+15551234567 -- node /absolute/pat
 
 ## Tool: `text_user`
 
-| Field | Type | |
-| --- | --- | --- |
-| `message` | string | required — the text to send, verbatim |
-
-The message is sent exactly as given; the server adds no prefix, suffix, or
-context of its own.
-
-Returns `{ sent: true }` on success, or a plain error string explaining why it
-wasn't sent. It never throws.
-
-## Rate limits
-
-Enforced by the server, not left to the caller:
-
-- at most 1 send per 10 minutes
-- at most 5 sends per server session
-
-A send over either limit is not delivered and returns an error saying so. An
-attempt that reaches `osascript` and fails still counts, which keeps a broken
-setup from retrying in a loop.
-
-## Notes
-
-The message and handle are passed to `osascript` as `argv` and never interpolated
-into the AppleScript source, so message content can't alter the script. The script
-doesn't call `activate`, so sending won't steal focus.
+Takes one required field, `message` (string), and sends it verbatim — the server
+adds no prefix, suffix, or context of its own. Returns `{ sent: true }`, or an
+error string explaining why it wasn't sent. It never throws.
 
 Sending is one-way. There is no receive path, no `chat.db` reading, no contact
 lookup, and no other tools.
+
+## Rate limits
+
+Enforced by the server: at most 1 send per 10 minutes, and 5 per server session.
+A send over either limit is not delivered and returns an error saying so. An
+attempt that reaches `osascript` and fails still counts, which keeps a broken
+setup from retrying in a loop.
