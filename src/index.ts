@@ -91,15 +91,11 @@ server.registerTool(
         .describe(
           "The message to send. The user reads it on a phone with no other context, so make it self-contained.",
         ),
-      reason: z
-        .string()
-        .min(1)
-        .describe("Short context for the message, appended to it as a second line."),
     },
     outputSchema: { sent: z.boolean() },
     annotations: { readOnlyHint: false, openWorldHint: true },
   },
-  async ({ message, reason }) => {
+  async ({ message }) => {
     try {
       if (process.platform !== "darwin") {
         return errorResult(
@@ -118,8 +114,6 @@ server.registerTool(
 
       const text = message.trim();
       if (!text) return errorResult("Not sent: message is empty.");
-      const why = reason.trim();
-      if (!why) return errorResult("Not sent: reason is empty.");
 
       if (sentThisSession >= MAX_PER_SESSION) {
         return errorResult(
@@ -138,15 +132,13 @@ server.registerTool(
         }
       }
 
-      const body = `${text}\n\n${why}`;
-
       // Reserve the slot before sending so a hung or failed send cannot be
       // retried in a tight loop.
       lastSentAt = Date.now();
       sentThisSession += 1;
 
       try {
-        await sendViaMessages(body, handle);
+        await sendViaMessages(text, handle);
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         return errorResult(

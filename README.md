@@ -28,8 +28,10 @@ claude mcp add imessage --env IMESSAGE_HANDLE=+15551234567 -- node /absolute/pat
 
 | Field | Type | |
 | --- | --- | --- |
-| `message` | string | required — the text to send, self-contained |
-| `reason` | string | required — short context, appended to the message as a second line |
+| `message` | string | required — the text to send, verbatim |
+
+The message is sent exactly as given; the server adds no prefix, suffix, or
+context of its own.
 
 Returns `{ sent: true }` on success, or a plain error string explaining why it
 wasn't sent. It never throws.
