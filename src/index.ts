@@ -44,7 +44,7 @@ server.registerTool(
     if (!handle) {
       return errorResult(
         "Not sent: IMESSAGE_HANDLE is not set. Set it to the user's phone number in " +
-          "E.164 form (e.g. +15551234567) or their Apple ID email.",
+          "E.164 form (e.g. +11234567890) or their Apple ID email.",
       );
     }
 

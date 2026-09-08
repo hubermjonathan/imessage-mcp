@@ -2,7 +2,7 @@
   "name": "imessage-mcp",
   "version": "1.0.0",
   "private": true,
-  "description": "Minimal stdio MCP server with a single tool that sends an iMessage (macOS only).",
+  "description": "Minimal MCP server with a single tool that sends an iMessage (macOS only).",
   "type": "module",
   "engines": {
     "node": ">=18"
