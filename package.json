@@ -2,7 +2,7 @@
   "name": "imessage-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal stdio MCP server with a single tool that texts you on iMessage (macOS only).",
+  "description": "Minimal stdio MCP server with a single tool that sends an iMessage (macOS only).",
   "type": "module",
   "bin": {
     "imessage-mcp": "dist/index.js"

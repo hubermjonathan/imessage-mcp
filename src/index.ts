@@ -25,36 +25,14 @@ const APPLESCRIPT = `on run argv
 	end tell
 end run`;
 
-const TOOL_DESCRIPTION = `Send the user a single iMessage to interrupt them, right now, on their phone.
+const TOOL_DESCRIPTION = `Send an iMessage to the user's configured handle.
 
-This is an interruption, not a notification channel. The user is away from the
-terminal and cannot see anything you write there. Use it only when continuing
-without them is worse than interrupting them.
+One-way: the message is delivered to the user's phone and there is no reply
+channel, so it must stand on its own. Requires macOS with Messages.app signed in
+to iMessage.
 
-Use it when:
-- You have hit a decision you cannot make alone — the options are genuinely
-  ambiguous, they hinge on the user's intent or priorities, and any further work
-  would likely be thrown away once they answer. Say what the decision is and what
-  the options are.
-- You found something the user would want to know before you finish — data loss,
-  a credential in the repo, a broken production path, a bug that is much worse
-  than the task you were given, a task premise that turns out to be false.
-
-Do not use it for:
-- Progress updates, status pings, or "starting on X now."
-- "Done", "finished", summaries, or anything that can wait for your final reply.
-- Questions you can answer yourself by reading the code, running the tests, or
-  making a reasonable, stated assumption.
-- Anything you could just as well put in your final response.
-
-If in doubt, do not send. Pick the most defensible option, state the assumption
-in your final answer, and keep working.
-
-One message per interruption: put the decision or finding, the options, and what
-you will do absent a reply in this single message — there is no reply channel and
-no second send. Rate limits are enforced by the server (1 per 10 minutes, 5 per
-session); a suppressed send returns an error and the user never sees it, so do
-not retry a suppressed message.`;
+The server rate limits sends to 1 per 10 minutes and 5 per server session. A send
+over either limit is not delivered and returns an error saying so.`;
 
 function errorResult(text: string) {
   return {
@@ -111,23 +89,17 @@ server.registerTool(
         .string()
         .min(1)
         .describe(
-          "The message to send. Self-contained: the user is reading it on a phone with no other context.",
+          "The message to send. The user reads it on a phone with no other context, so make it self-contained.",
         ),
-      urgency: z
-        .enum(["low", "normal", "high"])
-        .default("normal")
-        .describe("How badly this needs the user's attention right now."),
       reason: z
         .string()
         .min(1)
-        .describe(
-          "Why this warrants interrupting the user, in one line. If you cannot state a reason that survives scrutiny, do not send.",
-        ),
+        .describe("Short context for the message, appended to it as a second line."),
     },
     outputSchema: { sent: z.boolean() },
     annotations: { readOnlyHint: false, openWorldHint: true },
   },
-  async ({ message, urgency, reason }) => {
+  async ({ message, reason }) => {
     try {
       if (process.platform !== "darwin") {
         return errorResult(
@@ -151,9 +123,8 @@ server.registerTool(
 
       if (sentThisSession >= MAX_PER_SESSION) {
         return errorResult(
-          `Suppressed: session limit reached (${MAX_PER_SESSION} messages). The user did ` +
-            "NOT see this message and will not see any further ones this session. Do not " +
-            "retry — put it in your final response instead.",
+          `Not sent: session limit reached (${MAX_PER_SESSION} messages). This message was not ` +
+            "delivered, and no further messages will be delivered this session.",
         );
       }
 
@@ -161,18 +132,16 @@ server.registerTool(
         const remaining = COOLDOWN_MS - (Date.now() - lastSentAt);
         if (remaining > 0) {
           return errorResult(
-            `Suppressed: rate limited (1 message per 10 minutes; ${formatDuration(remaining)} ` +
-              "left). The user did NOT see this message. Do not retry — carry on and put it " +
-              "in your final response instead.",
+            `Not sent: rate limited (1 message per 10 minutes; ${formatDuration(remaining)} ` +
+              "left). This message was not delivered.",
           );
         }
       }
 
-      const prefix = urgency === "normal" ? "[Claude]" : `[Claude · ${urgency}]`;
-      const body = `${prefix} ${text}\n\nWhy now: ${why}`;
+      const body = `${text}\n\n${why}`;
 
-      // Reserve the slot before sending so a hung/failed send cannot be retried
-      // in a tight loop.
+      // Reserve the slot before sending so a hung or failed send cannot be
+      // retried in a tight loop.
       lastSentAt = Date.now();
       sentThisSession += 1;
 
@@ -190,8 +159,7 @@ server.registerTool(
 
       return okResult(
         { sent: true },
-        `Sent to ${handle} (${sentThisSession}/${MAX_PER_SESSION} this session). There is no ` +
-          "reply channel — do not wait for an answer.",
+        `Sent to ${handle} (${sentThisSession}/${MAX_PER_SESSION} this session).`,
       );
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
