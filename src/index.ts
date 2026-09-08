@@ -5,12 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const COOLDOWN_MS = 10 * 60 * 1000;
-const MAX_PER_SESSION = 5;
 const SEND_TIMEOUT_MS = 20_000;
-
-let lastSentAt: number | null = null;
-let sentThisSession = 0;
 
 const run = promisify(execFile);
 
@@ -39,9 +34,7 @@ server.registerTool(
     description:
       "Send an iMessage to the user's configured handle. One-way: there is no reply " +
       "channel, so the message must stand on its own. Requires macOS with Messages.app " +
-      `signed in to iMessage. Rate limited to 1 send per ${COOLDOWN_MS / 60_000} minutes ` +
-      `and ${MAX_PER_SESSION} per server session; a send over either limit is not ` +
-      "delivered and returns an error.",
+      "signed in to iMessage.",
     inputSchema: {
       message: z
         .string()
@@ -63,25 +56,6 @@ server.registerTool(
       );
     }
 
-    if (sentThisSession >= MAX_PER_SESSION) {
-      return errorResult(
-        `Not sent: session limit reached (${MAX_PER_SESSION} messages). No further ` +
-          "messages will be delivered this session.",
-      );
-    }
-
-    const remaining = lastSentAt === null ? 0 : COOLDOWN_MS - (Date.now() - lastSentAt);
-    if (remaining > 0) {
-      return errorResult(
-        `Not sent: rate limited, ${Math.ceil(remaining / 1000)}s left before the next send.`,
-      );
-    }
-
-    // Reserve the slot before sending so a hung or failed send cannot be
-    // retried in a tight loop.
-    lastSentAt = Date.now();
-    sentThisSession += 1;
-
     try {
       await run("/usr/bin/osascript", ["-e", APPLESCRIPT, message, handle], {
         timeout: SEND_TIMEOUT_MS,
@@ -92,17 +66,12 @@ server.registerTool(
         `Not sent: ${detail}\nCommon causes: not running on macOS, Messages.app is not ` +
           "signed in to iMessage, the handle is not reachable over iMessage, or this " +
           "process lacks Automation permission for Messages (System Settings → Privacy " +
-          "& Security → Automation). This attempt still counted against the rate limit.",
+          "& Security → Automation).",
       );
     }
 
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Sent to ${handle} (${sentThisSession}/${MAX_PER_SESSION} this session).`,
-        },
-      ],
+      content: [{ type: "text" as const, text: `Sent to ${handle}.` }],
       structuredContent: { sent: true },
     };
   },
