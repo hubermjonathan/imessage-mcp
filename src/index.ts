@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -9,32 +10,23 @@ const SEND_TIMEOUT_MS = 20_000;
 
 const run = promisify(execFile);
 
-/**
- * Fixed script source; the message and handle arrive as argv, so nothing from
- * the model is interpolated into the script text. No `activate` — sending must
- * not steal focus.
- */
-const APPLESCRIPT = `on run argv
-  tell application "Messages"
-    set svc to 1st service whose service type = iMessage
-    send item 1 of argv to buddy (item 2 of argv) of svc
-  end tell
-end run`;
+const SCRIPT_PATH = fileURLToPath(new URL("./send.applescript", import.meta.url));
 
 function errorResult(text: string) {
   return { isError: true, content: [{ type: "text" as const, text }] };
 }
 
-const server = new McpServer({ name: "imessage-mcp", version: "0.1.0" });
+const server = new McpServer({ name: "imessage-mcp", version: "1.0.0" });
 
 server.registerTool(
   "text_user",
   {
-    title: "Text the user on iMessage",
+    title: "Text the user",
     description:
-      "Send an iMessage to the user's configured handle. One-way: there is no reply " +
-      "channel, so the message must stand on its own. Requires macOS with Messages.app " +
-      "signed in to iMessage.",
+      "Send a text message to the user's phone. Use it when the user has asked to " +
+      "be texted, for example \"text me when the deploy finishes\" or \"text me if you " +
+      "get stuck\". One-way: there is no reply channel, so the message must stand on " +
+      "its own.",
     inputSchema: {
       message: z
         .string()
@@ -57,7 +49,7 @@ server.registerTool(
     }
 
     try {
-      await run("/usr/bin/osascript", ["-e", APPLESCRIPT, message, handle], {
+      await run("/usr/bin/osascript", [SCRIPT_PATH, message, handle], {
         timeout: SEND_TIMEOUT_MS,
       });
     } catch (err) {
@@ -65,8 +57,8 @@ server.registerTool(
       return errorResult(
         `Not sent: ${detail}\nCommon causes: not running on macOS, Messages.app is not ` +
           "signed in to iMessage, the handle is not reachable over iMessage, or this " +
-          "process lacks Automation permission for Messages (System Settings → Privacy " +
-          "& Security → Automation).",
+          "process lacks Automation permission for Messages (System Settings > Privacy " +
+          "& Security > Automation).",
       );
     }
 

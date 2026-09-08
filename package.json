@@ -1,6 +1,6 @@
 {
   "name": "imessage-mcp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Minimal stdio MCP server with a single tool that sends an iMessage (macOS only).",
   "type": "module",
@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/send.applescript dist/",
     "start": "node dist/index.js"
   },
   "dependencies": {
